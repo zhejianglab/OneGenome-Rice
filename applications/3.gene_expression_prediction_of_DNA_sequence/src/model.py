@@ -295,7 +295,14 @@ def predictions_scaling_torch(
 
     mask = torch.tensor(squashing_mask, dtype=torch.bool, device=preds.device).view(*([1] * (preds.ndim - 1)), C)
 
-    # inverse squashing: preds_out = where(mask, preds ** (1/0.75), preds)
+    # Invert targets_scaling_torch in the exact reverse order:
+    # raw/mean -> power(0.75) -> optional high-value sqrt compression.
+    # Therefore prediction inverse is:
+    # optional high-value quadratic expansion -> power(1/0.75) -> multiply by mean.
+    quad_mask = (preds > 10.0) & mask
+    preds_quad = (preds + 10.0).pow(2) / (4.0 * 10.0)
+    preds = torch.where(quad_mask, preds_quad, preds)
+
     inv_pow = 1.0 / 0.75
     preds_pow = preds.pow(inv_pow)
     preds = torch.where(mask, preds_pow, preds)
@@ -305,11 +312,6 @@ def predictions_scaling_torch(
         preds = preds * tm_view
     except Exception:
         preds = preds * tm.mean()
-
-    # inverse piecewise: for values > 10 apply quadratic inverse
-    quad_mask = preds > 10.0
-    preds_quad = (preds + 10.0).pow(2) / (4.0 * 10.0)
-    preds = torch.where(quad_mask, preds_quad, preds)
 
     # restore single-channel shape and sanitize
     if single_channel:

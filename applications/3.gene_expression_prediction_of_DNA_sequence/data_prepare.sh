@@ -68,7 +68,7 @@ for atissue in ${tissue[@]};do
     done
 done
 
-python csv.generator.py --tissues ${tissue[@]} --species_range ${train_species_file[@]} --bwlist bwList_* --output_dir ./ref
+python ${outdir}/scripts/data_preprocess/csv.generator.py --tissues ${tissue[@]} --species_range ${train_species_file[@]} --bwlist bwList_* --output_dir ./ref
 rm bwList_*
 
 for atissue in ${tissue[@]};do
@@ -77,7 +77,7 @@ for atissue in ${tissue[@]};do
     done
 done
 
-python csv.generator.py --tissues ${tissue[@]} --species_range ${valid_species_file[@]} --bwlist bwList_* --output_dir ./ref
+python ${outdir}/scripts/data_preprocess/csv.generator.py --tissues ${tissue[@]} --species_range ${valid_species_file[@]} --bwlist bwList_* --output_dir ./ref
 rm bwList_* 
 
 for atissue in ${tissue[@]};do
@@ -86,7 +86,7 @@ for atissue in ${tissue[@]};do
     done
 done
 
-python csv.generator.py --tissues ${tissue[@]} --species_range ${test_species_file[@]} --bwlist bwList_* --output_dir ./ref
+python ${outdir}/scripts/data_preprocess/csv.generator.py --tissues ${tissue[@]} --species_range ${test_species_file[@]} --bwlist bwList_* --output_dir ./ref
 rm bwList_*
 
 #generate index index_stat.json and sequence_split_train.csv file
@@ -100,7 +100,7 @@ for species_file in ${train_species_file[@]};do
         --overlap 16384 \
         --meta_csv ref/${tissues}_${species}.csv \
         --assay_titles "total RNA-seq" \
-        --biosample_names "rice" \
+        --biosample_names "${tissue[@]}" \
         --output_base_dir ${outdir}/data/indices/test_${tissues}_${species}_multitrack \
         --processed_bw_dir ${outdir}/data/processed/renorm_bigwig_output
 done
@@ -116,7 +116,7 @@ for species_file in ${valid_species_file[@]};do
         --overlap 16384 \
         --meta_csv ref/${tissues}_${species}.csv \
         --assay_titles "total RNA-seq" \
-        --biosample_names "rice" \
+        --biosample_names "${tissue[@]}" \
         --output_base_dir ${outdir}/data/indices/valid_${tissues}_${species}_multitrack \
         --processed_bw_dir ${outdir}/data/processed/renorm_bigwig_output
 done
@@ -132,7 +132,7 @@ for species_file in ${test_species_file[@]};do
         --overlap 16384 \
         --meta_csv ref/${tissues}_${species}.csv \
         --assay_titles "total RNA-seq" \
-        --biosample_names "rice" \
+        --biosample_names "${tissue[@]}" \
         --output_base_dir ${outdir}/data/indices/test_${tissues}_${species}_multitrack \
         --processed_bw_dir ${outdir}/data/processed/renorm_bigwig_output
 done
