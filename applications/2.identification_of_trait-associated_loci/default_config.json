@@ -6,15 +6,21 @@
   "paths": {
     "data_dir": "Data",
     "results_dir": "Results",
-    "vcf": "Data/samples.vcf.gz",
-    "vcf_index": "Data/samples.vcf.gz.tbi",
-    "phenotype": "Data/phenotype.tsv",
+    "vcf": "Data/glutinous.vcf.gz",
+    "vcf_index": "Data/glutinous.vcf.gz.tbi",
+    "phenotype": "Data/glutinous.tsv",
     "reference_fasta": "Data/osa1_r7.asm.fa.gz",
     "reference_fasta_fai": "Data/osa1_r7.asm.fa.gz.fai",
     "reference_fasta_gzi": "Data/osa1_r7.asm.fa.gz.gzi",
     "gene_annotation": "Data/chr06.gff3.gz",
-    "candidate_regions": "Data/candidate_regions.bed",
-    "model": "Data/OneGenomeRice_model" // You may need to set it into your path to OneGenomeRice model.
+    "grain_length_gene_annotation": "Data/chr03.gff3.gz",
+    "grain_length_matrix_dir": "Results/grain_length/attention/04_attention_matrices",
+    "grain_length_vcf": "Data/grain_length.vcf.gz",
+    "grain_length_vcf_index": "Data/grain_length.vcf.gz.tbi",
+    "grain_length_phenotype": "Data/grain_length.tsv",
+    "candidate_regions": "Data/glutinous_regions.bed",
+    "grain_length_regions": "Data/grain_length_regions.bed",
+    "model": "Data/OneGenomeRice_model"
   },
   "workflow": {
     "chromosome": 6,
@@ -38,6 +44,15 @@
     "target_genes": {
       "LOC_Os06g04200": "Wx",
       "LOC_Os06g12450": "ALK"
+    },
+    "grain_length": {
+      "chromosome": 3,
+      "start_block": 1,
+      "end_block": 10,
+      "slice_start": 2002,
+      "slice_end": 6001,
+      "phenotype_column": "grain_length",
+      "n_pcs": 5
     },
     "reference_download": {
       "url": "https://rice.uga.edu/osa1r7_download/osa1_r7.asm.fa.gz"

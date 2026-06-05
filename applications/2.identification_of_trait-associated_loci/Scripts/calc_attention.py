@@ -22,6 +22,10 @@ def load_config(config_path: Path) -> tuple[Path, dict]:
     return root, json.loads(config_path.read_text(encoding="utf-8"))
 
 
+def glutinous_results(root: Path, cfg: dict) -> Path:
+    return rel(root, cfg["paths"]["results_dir"]) / "glutinous"
+
+
 def read_regions(path: Path) -> list[tuple[str, int, int]]:
     regions: list[tuple[str, int, int]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -78,7 +82,7 @@ def run_region(
 ) -> None:
     scripts = root / "Scripts" / "lib"
     paths = cfg["paths"]
-    base = rel(root, paths["results_dir"]) / "attention"
+    base = glutinous_results(root, cfg) / "attention"
     region_name = f"region_{region_index}"
 
     out1 = base / "01_pseudo_sequences" / region_name
@@ -187,7 +191,7 @@ def main() -> int:
     paths = cfg["paths"]
     workflow = cfg["workflow"]
 
-    base = rel(root, paths["results_dir"]) / "attention"
+    base = glutinous_results(root, cfg) / "attention"
     bed_dir = base / "region_beds"
     bed_dir.mkdir(parents=True, exist_ok=True)
 

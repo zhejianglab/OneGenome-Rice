@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${CONFIG:-${ROOT_DIR}/default_config.json}"
+export MPLCONFIGDIR="${MPLCONFIGDIR:-${ROOT_DIR}/Results/.mplconfig}"
+mkdir -p "${MPLCONFIGDIR}"
 
 CONDA_SH="$(python - "${CONFIG}" <<'PY'
 import json, sys
@@ -24,7 +26,7 @@ if [[ -n "${CONDA_ENV}" ]]; then
         source "${CONDA_SH}"
     fi
     conda run --no-capture-output -n "${CONDA_ENV}" \
-        python "${ROOT_DIR}/Scripts/calc_attention.py" --config "${CONFIG}" "$@"
+        python "${ROOT_DIR}/Scripts/grain_length_pipeline.py" --config "${CONFIG}" "$@"
 else
-    python "${ROOT_DIR}/Scripts/calc_attention.py" --config "${CONFIG}" "$@"
+    python "${ROOT_DIR}/Scripts/grain_length_pipeline.py" --config "${CONFIG}" "$@"
 fi

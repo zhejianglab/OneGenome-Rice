@@ -162,6 +162,11 @@ def main() -> int:
         "reference_fasta_fai",
         "reference_fasta_gzi",
         "gene_annotation",
+        "grain_length_gene_annotation",
+        "grain_length_vcf",
+        "grain_length_vcf_index",
+        "grain_length_phenotype",
+        "grain_length_regions",
         "candidate_regions",
         "model",
     ]
