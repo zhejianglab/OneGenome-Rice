@@ -6,10 +6,10 @@ from typing import Optional, Union
 
 import torch
 
-from megatron.core import parallel_state, tensor_parallel, utils
-from megatron.core.process_groups_config import ProcessGroupCollection
+from megatron.core import parallel_state, tensor_parallel
+from megatron.core.process_groups_config import ModelCommProcessGroups
 from megatron.core.transformer.module import MegatronModule
-from megatron.core.transformer.moe.moe_utils import get_default_pg_collection
+from megatron.core.transformer.moe.moe_utils import get_default_model_comm_pgs
 from megatron.core.transformer.moe.router import TopKRouter
 from megatron.core.transformer.moe.token_dispatcher import (
     MoEAllGatherTokenDispatcher,
@@ -21,8 +21,6 @@ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 
 try:
-    import transformer_engine as te  # pylint: disable=unused-import
-
     from megatron.core.extensions.transformer_engine import te_checkpoint
 
     HAVE_TE = True
@@ -49,16 +47,16 @@ class BaseMoELayer(MegatronModule, ABC):
         self,
         config: TransformerConfig,
         layer_number: Optional[int] = None,
-        pg_collection: Optional[ProcessGroupCollection] = None,
+        model_comm_pgs: Optional[ModelCommProcessGroups] = None,
     ):
         super(BaseMoELayer, self).__init__(config)
         self.config = config
         self.layer_number = layer_number
-        self.ep_group = pg_collection.ep
-        # use pg_collection.expt_tp_group as tensor parallel group in this module.
-        self.attn_tp_group = pg_collection.tp
-        ep_size = utils.get_pg_size(self.ep_group)
-        ep_rank = utils.get_pg_rank(self.ep_group)
+        self.ep_group = model_comm_pgs.ep
+        # use model_comm_pgs.expt_tp_group as tensor parallel group in this module.
+        self.attn_tp_group = model_comm_pgs.tp
+        ep_size = self.ep_group.size()
+        ep_rank = self.ep_group.rank()
         assert ep_size > 0, "Expected non-negative expert parallel size"
 
         assert self.config.num_moe_experts % ep_size == 0
@@ -102,26 +100,22 @@ class MoELayer(BaseMoELayer):
         config: TransformerConfig,
         submodules: Optional[MoESubmodules] = None,
         layer_number: Optional[int] = None,
-        pg_collection: Optional[ProcessGroupCollection] = None,
+        model_comm_pgs: Optional[ModelCommProcessGroups] = None,
     ):
         self.submodules = submodules
         # TODO(Hepteract): delete the usage of the global parallel_state.
         # Initialize process groups with the global parallel_state.
-        if pg_collection is None:
-            pg_collection = get_default_pg_collection()
+        if model_comm_pgs is None:
+            model_comm_pgs = get_default_model_comm_pgs()
         super(MoELayer, self).__init__(
-            config=config, layer_number=layer_number, pg_collection=pg_collection
+            config=config, layer_number=layer_number, model_comm_pgs=model_comm_pgs
         )
         self.moe_layer_recompute = (
             config.recompute_granularity == 'selective' and "moe" in config.recompute_modules
         )
-        self.shared_experts_recompute = (
-            config.recompute_granularity == 'selective'
-            and "shared_experts" in config.recompute_modules
-        )
 
         # Initialize router
-        self.router = TopKRouter(config=self.config, pg_collection=pg_collection)
+        self.router = TopKRouter(config=self.config, model_comm_pgs=model_comm_pgs)
 
         # Initialize token dispatcher
         if config.moe_token_dispatcher_type == "allgather":
@@ -129,21 +123,21 @@ class MoELayer(BaseMoELayer):
                 self.num_local_experts,
                 self.local_expert_indices,
                 config=self.config,
-                pg_collection=pg_collection,
+                model_comm_pgs=model_comm_pgs,
             )
         elif config.moe_token_dispatcher_type == "alltoall":
             self.token_dispatcher = MoEAlltoAllTokenDispatcher(
                 self.num_local_experts,
                 self.local_expert_indices,
                 config=self.config,
-                pg_collection=pg_collection,
+                model_comm_pgs=model_comm_pgs,
             )
         elif config.moe_token_dispatcher_type == "flex":
             self.token_dispatcher = MoEFlexTokenDispatcher(
                 self.num_local_experts,
                 self.local_expert_indices,
                 config=self.config,
-                pg_collection=pg_collection,
+                model_comm_pgs=model_comm_pgs,
             )
         else:
             raise ValueError(
@@ -155,13 +149,13 @@ class MoELayer(BaseMoELayer):
             self.submodules.experts,
             self.num_local_experts,
             self.config,
-            pg_collection=pg_collection,
+            model_comm_pgs=model_comm_pgs,
         )
 
         # Initialize shared experts
         if self.use_shared_expert:
             self.shared_experts = build_module(
-                self.submodules.shared_experts, config=self.config, pg_collection=pg_collection
+                self.submodules.shared_experts, config=self.config, model_comm_pgs=model_comm_pgs
             )
             if self.shared_expert_overlap:
                 self.token_dispatcher.set_shared_experts(self.shared_experts)
@@ -189,42 +183,21 @@ class MoELayer(BaseMoELayer):
         """
         return self.token_dispatcher.token_dispatch(hidden_states, probs)
 
-    def shared_experts_compute(self, hidden_states: torch.Tensor):
-        """Computes the output of the shared experts.
+    def experts_compute(
+        self, hidden_states: torch.Tensor, probs: torch.Tensor, residual: torch.Tensor
+    ):
+        """Computes the output of the experts on the dispatched tokens.
 
+        This method first post-processes the dispatched input to get permuted tokens
+        for each expert. It then passes the tokens through the local experts.
         If a shared expert is configured and not overlapped with communication,
-        it is computed here.
+        it is also applied. The output from the experts is preprocessed for the
+        combine step.
         """
         shared_expert_output = None
         if self.use_shared_expert and not self.shared_expert_overlap:
             # Compute the shared expert separately when not overlapped with communication.
-            if self.shared_experts_recompute:
-                if self.config.fp8:
-                    shared_expert_output = te_checkpoint(
-                        self.shared_experts,
-                        False,
-                        tensor_parallel.random.get_cuda_rng_tracker,
-                        parallel_state.get_tensor_model_parallel_group(),
-                        hidden_states,
-                    )
-                else:
-                    shared_expert_output = tensor_parallel.checkpoint(
-                        self.shared_experts, False, hidden_states
-                    )
-            else:
-                shared_expert_output = self.shared_experts(hidden_states)
-
-        return shared_expert_output
-
-    def routed_experts_compute(
-        self, hidden_states: torch.Tensor, probs: torch.Tensor, residual: torch.Tensor
-    ):
-        """Computes the output of the routed experts on the dispatched tokens.
-
-        This method first post-processes the dispatched input to get permuted tokens
-        for each expert. It then passes the tokens through the local experts.
-        The output from the experts is preprocessed for the combine step.
-        """
+            shared_expert_output = self.shared_experts(residual)
         dispatched_input, tokens_per_expert, permuted_probs = (
             self.token_dispatcher.dispatch_postprocess(hidden_states, probs)
         )
@@ -232,7 +205,7 @@ class MoELayer(BaseMoELayer):
         assert mlp_bias is None, f"mlp_bias is not supported for {type(self.token_dispatcher)}"
         output = self.token_dispatcher.combine_preprocess(expert_output)
 
-        return output, mlp_bias
+        return output, shared_expert_output, mlp_bias
 
     def combine(self, output: torch.Tensor, shared_expert_output: Optional[torch.Tensor]):
         """Combines expert outputs via communication and adds shared expert output.
@@ -270,10 +243,11 @@ class MoELayer(BaseMoELayer):
 
         # MoE forward: route -> dispatch -> compute -> combine
         def custom_forward(hidden_states):
-            shared_expert_output = self.shared_experts_compute(hidden_states)
             hidden_states, probs, residual = self.router_and_preprocess(hidden_states)
             dispatched_input, probs = self.dispatch(hidden_states, probs)
-            output, mlp_bias = self.routed_experts_compute(dispatched_input, probs, residual)
+            output, shared_expert_output, mlp_bias = self.experts_compute(
+                dispatched_input, probs, residual
+            )
             output = self.combine(output, shared_expert_output)
             return output, mlp_bias
 
@@ -298,12 +272,3 @@ class MoELayer(BaseMoELayer):
         self.experts.backward_dw()
         if self.use_shared_expert and not self.shared_expert_overlap:
             self.shared_experts.backward_dw()
-
-    def set_for_recompute_pre_mlp_layernorm(self):
-        """Set the MoE layer for recompute pre_mlp_layernorm. Only needed for fp8."""
-        # If shared_experts_recompute is used, nothing needs to be done because the checkpoint
-        # function will save the original input tensors.
-        if self.shared_experts is not None and not self.shared_experts_recompute:
-            from megatron.core.extensions.transformer_engine import set_save_original_input
-
-            set_save_original_input(self.shared_experts.linear_fc1)

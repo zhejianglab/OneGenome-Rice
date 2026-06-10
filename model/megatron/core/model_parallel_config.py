@@ -1,6 +1,5 @@
 # Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 
-import warnings
 from dataclasses import dataclass
 from typing import Callable, ContextManager, Optional
 
@@ -238,14 +237,6 @@ class ModelParallelConfig:
        Set the bootstrapping backend out of 'nccl', 'mpi', and 'gloo'
     """
 
-    overlap_moe_expert_parallel_comm: bool = False
-    """Overlap EP A2A communications with independent computations of different micro-batches
-    in 1f1b phase of pipelining or non-pipelining schedule.
-    """
-
-    delay_wgrad_compute: bool = False
-    """Delay the weight gradient computation to improve batch-level communication overlapping"""
-
     ###################
     # Pipeline Parallel
     ###################
@@ -295,6 +286,11 @@ class ModelParallelConfig:
        Defaults to 0, which means all micro-batches are deferred.
     """
 
+    pipeline_model_parallel_split_rank: Optional[int] = None
+    """If int, rank where encoder and decoder should be split in cases where the model has both an
+       encoder and decoder (e.g., T5). Ignored if None.
+    """
+
     overlap_p2p_comm_warmup_flush: bool = False
     """If true, overlap communication and computation in warm up and flush phase.
        Only valid when overlap_p2p_comm is True and batch_p2p_comm is False. 
@@ -316,6 +312,9 @@ class ModelParallelConfig:
        rank 1 |   0 1 2 0 1 2 3 4 3 4
     """
 
+    delay_wgrad_compute: bool = False
+    """If true, delay the wgrad compute for better overlapping in combined 1F1B."""
+
     ###################
     # CPU Offloading
     ###################
@@ -335,11 +334,8 @@ class ModelParallelConfig:
     cpu_offloading_activations: bool = True
     """If True, offloads the activations to CPU."""
 
-    cpu_offloading_weights: bool = False
+    cpu_offloading_weights: bool = True
     """If True, offloads the weights to CPU."""
-
-    cpu_offloading_double_buffering: bool = False
-    """If True, enables double buffering across layers while reloading activations from CPU."""
 
     ###################
     # Timing
@@ -357,7 +353,7 @@ class ModelParallelConfig:
         """
         if self.sequence_parallel:
             if self.tensor_model_parallel_size <= 1:
-                raise ValueError("Cannot use sequence parallelism without tensor parallelism")
+                raise ValueError("Can not use sequence paralllelism without tensor parallelism")
 
         if self.expert_tensor_parallel_size is None:
             self.expert_tensor_parallel_size = self.tensor_model_parallel_size
@@ -388,8 +384,8 @@ class ModelParallelConfig:
 
         if self.expert_model_parallel_size > 1 and self.tensor_model_parallel_size > 1:
             if self.sequence_parallel is False:
-                warnings.warn(
-                    "When using expert parallelism and tensor parallelism for training, "
+                raise ValueError(
+                    "When using expert parallelism and tensor parallelism, "
                     "sequence parallelism must be used"
                 )
 

@@ -11,29 +11,16 @@ import os
 
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from megatron.core.datasets.retro.config import RetroPreprocessingConfig
+from megatron.core.datasets.retro.external_libs import faiss
 from megatron.core.datasets.retro.index.index import Index
 from megatron.core.datasets.retro.index.utils import (
     get_training_data_merged_path,
     num_samples_to_block_ranges,
 )
 from megatron.core.datasets.retro.utils import GPTToTextDataset, log_retro_rank_0
-
-try:
-    import faiss
-
-    HAVE_FAISS = True
-except ImportError:
-    HAVE_FAISS = False
-
-
-try:
-    from tqdm import tqdm
-
-    HAVE_TQDM = True
-except ImportError:
-    HAVE_TQDM = False
 
 
 class FaissBaseIndex(Index):
@@ -51,11 +38,6 @@ class FaissBaseIndex(Index):
         Args:
             config (RetroPreprocessingConfig): Retro preprocessing config.
         """
-
-        if not HAVE_FAISS:
-            raise ImportError(
-                "faiss is required to use the FaissBaseIndex class. Please install faiss."
-            )
 
         assert torch.distributed.get_rank() == 0
 
@@ -110,19 +92,8 @@ class FaissBaseIndex(Index):
 
         Args:
             config (RetroPreprocessingConfig): Retro preprocessing config.
-            text_dataset (GPTToTextDataset): Text dataset that will be embedded
-                and added to the index.
+            text_dataset (GPTToTextDataset): Text dataset that will be embedded and added to the index.
         """
-
-        if not HAVE_FAISS:
-            raise ImportError(
-                "faiss is required to use the FaissBaseIndex class. Please install faiss."
-            )
-
-        if not HAVE_TQDM:
-            raise ImportError(
-                "tqdm is required to use the FaissBaseIndex class. Please install tqdm."
-            )
 
         assert torch.distributed.get_rank() == 0
 
@@ -147,6 +118,7 @@ class FaissBaseIndex(Index):
 
         # Iterate data blocks & add.
         for sample_range in tqdm(dataset_sample_ranges, "faiss_base.add"):
+
             # Embed text.
             embeds = self.embed_text_dataset_block(embedder, text_dataset, sample_range)
 
@@ -161,8 +133,7 @@ class FaissBaseIndex(Index):
 
         Args:
             config (RetroPreprocessingConfig): Retro preprocessing config.
-            text_dataset (GPTToTextDataset): Text dataset that will be embedded
-                and added to the index.
+            text_dataset (GPTToTextDataset): Text dataset that will be embedded and added to the index.
 
         Returns:
             File path to the populated index.

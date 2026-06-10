@@ -1,10 +1,9 @@
 # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 
+import numpy
 
 # Implicit imports for backwards compatibility
 # Explicit imports for readability
-import numpy
-
 from megatron.core.datasets.helpers_cpp import *
 from megatron.core.datasets.helpers_cpp import build_sample_idx_int32, build_sample_idx_int64
 
@@ -40,7 +39,6 @@ def build_sample_idx(
     Returns:
         numpy.ndarray: The 2-D sample index
     """
-
     sample_idx_max = max(document_indices.shape[0], sizes.max())
     if sample_idx_max <= numpy.iinfo(numpy.int32).max:
         sample_idx = build_sample_idx_int32(

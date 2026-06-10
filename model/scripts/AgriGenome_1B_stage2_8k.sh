@@ -19,7 +19,7 @@ CHECKPOINT_PATH=/mnt/rice/AgriGenome_1B_stage2_8k/$WANDB_NAME
 # ================end================
 
 TOKENIZER_TYPE=SentencePieceTokenizer
-TOKENIZER_MODEL=/mnt/rice/tokenizer/one_hot.bpe.model
+TOKENIZER_MODEL=tokenizer/one_hot.bpe.model
 MICRO_BATCH_SIZE=1
 GLOBAL_BATCH_SIZE=1024
 

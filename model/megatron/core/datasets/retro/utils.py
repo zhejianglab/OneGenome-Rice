@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict
 import numpy as np
 import torch
 from torch.distributed import ProcessGroup
+from tqdm import tqdm
 
 from megatron.core import parallel_state
 from megatron.core.datasets.retro.config import RetroPreprocessingConfig
@@ -20,21 +21,9 @@ from megatron.core.datasets.retro.query.multi_split_gpt_dataset import (
 )
 from megatron.core.utils import log_single_rank
 
+from .external_libs import h5py
+
 logger = logging.getLogger(__name__)
-
-try:
-    from tqdm import tqdm
-
-    HAVE_TQDM = True
-except ImportError:
-    HAVE_TQDM = False
-
-try:
-    import h5py
-
-    HAVE_H5PY = True
-except ImportError:
-    HAVE_H5PY = False
 
 
 class Block(TypedDict):
@@ -99,6 +88,7 @@ class GPTToTextDataset(torch.utils.data.Dataset):
     """
 
     def __init__(self, gpt_dataset: MultiSplitGPTDataset, gpt_tokenizer: Any):
+
         super().__init__()
 
         self.gpt_dataset = gpt_dataset
@@ -151,12 +141,6 @@ def get_blocks(
         equal n_samples above.
     """
 
-    if not HAVE_TQDM:
-        raise ImportError("tqdm is required to use the RetroDataset. Please install tqdm.")
-
-    if not HAVE_H5PY:
-        raise ImportError("h5py is required to use the RetroDataset. Please install h5py.")
-
     assert os.path.isdir(dirname), "missing directory '%s.'" % dirname
 
     # Block ranges.
@@ -187,6 +171,7 @@ def get_blocks(
             block["path"] for block in all_blocks if os.path.exists(block["path"])
         ]
         for index, path in enumerate(tqdm(existing_block_paths, "validating block.")):
+
             assert path in all_block_path_set, "unexpected filename, '%s'." % path
 
             try:
@@ -248,7 +233,6 @@ def get_blocks_by_rank(
         total number of existing and missing blocks, independent of samples.
         Therefore, (n_existing_world + n_missing_world) * block_size == n_samples.
     """
-
     if process_group is None:
         process_group = parallel_state.get_data_parallel_group()
 

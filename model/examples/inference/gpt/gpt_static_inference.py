@@ -4,50 +4,41 @@ import os
 from megatron.core.inference.model_inference_wrappers.inference_wrapper_config import (
     InferenceWrapperConfig,
 )
-from model_provider import model_provider
-from gpt_builders import gpt_builder
-from mamba_builders import mamba_builder
+from pretrain_mamba import model_provider as mamba_model_provider
+from pretrain_gpt import model_provider as gpt_model_provider
 import torch
 import sys
 import time
-import warnings
-from functools import partial
-from argparse import Namespace
-
-import torch
 import tqdm
-
+import warnings
+from argparse import Namespace
 from megatron.core.inference.contexts import StaticInferenceContext
 from megatron.core.inference.engines import StaticInferenceEngine
-from megatron.core.inference.inference_request import InferenceRequest
+from megatron.core.inference.sampling_params import SamplingParams
 from megatron.core.inference.model_inference_wrappers.gpt.gpt_inference_wrapper import (
     GPTInferenceWrapper,
 )
-from megatron.core.inference.model_inference_wrappers.inference_wrapper_config import (
-    InferenceWrapperConfig,
-)
-from megatron.core.inference.sampling_params import SamplingParams
+from megatron.core.inference.inference_request import InferenceRequest
 from megatron.core.inference.text_generation_controllers.text_generation_controller import (
     TextGenerationController,
 )
-from megatron.core.tokenizers.text.utils.build_tokenizer import build_tokenizer
 from megatron.core.transformer.module import MegatronModule
-from pretrain_gpt import model_provider as gpt_model_provider
-from pretrain_mamba import model_provider as mamba_model_provider
 
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir))
 )
 
-import asyncio
+from megatron.training import get_args, get_tokenizer, print_rank_0
+from megatron.training.checkpointing import load_checkpoint
+from megatron.core import mpu
 import json
-from typing import Any, AsyncIterator, List
+from megatron.training.initialize import initialize_megatron
+from megatron.training import get_model
+import asyncio
+from typing import AsyncIterator, List
 
 from examples.inference.gpt.utils import add_common_inference_args, build_requests
-from megatron.core import mpu
-from megatron.training import get_args, get_model, get_tokenizer, print_rank_0
-from megatron.training.checkpointing import load_checkpoint
-from megatron.training.initialize import initialize_megatron
+
 
 def add_static_inference_args(parser):
     """Static inference arguments."""
@@ -63,6 +54,9 @@ def add_static_inference_args(parser):
         help='Deprecated, use `--inference-max-requests` instead',
     )
     group.add_argument("--stream", action="store_true", default=False, help="Stream output tokens")
+    group.add_argument(
+        "--output-path", type=str, default=None, help="Path to save generations as JSON"
+    )
 
     return parser
 
@@ -79,10 +73,8 @@ def get_inference_engine(args: Namespace, model: MegatronModule) -> StaticInfere
     Returns:
         AbstractBackend: The chosen backend
     """
-    if args.legacy_tokenizer:
-        tokenizer = get_tokenizer()
-    else:
-        tokenizer = build_tokenizer(args)
+    tokenizer = get_tokenizer()
+
     inference_wrapper_config = InferenceWrapperConfig(
         hidden_size=args.hidden_size,
         inference_batch_times_seqlen_threshold=args.inference_batch_times_seqlen_threshold,
@@ -92,8 +84,6 @@ def get_inference_engine(args: Namespace, model: MegatronModule) -> StaticInfere
         inference_max_requests=args.inference_max_batch_size,
         inference_max_seq_length=args.inference_max_seq_length,
         nccl_all_reduce_for_prefill=args.nccl_all_reduce_for_prefill,
-        fp8=args.fp8,
-        moe_pad_experts_for_cuda_graph_inference = args.moe_pad_experts_for_cuda_graph_inference
     )
 
     inference_context = StaticInferenceContext.from_config(inference_wrapper_config)
@@ -104,7 +94,7 @@ def get_inference_engine(args: Namespace, model: MegatronModule) -> StaticInfere
     text_generation_controller = TextGenerationController(
         inference_wrapped_model=inference_wrapped_model, tokenizer=tokenizer
     )
-    return StaticInferenceEngine(text_generation_controller=text_generation_controller, legacy=args.use_legacy_static_engine)
+    return StaticInferenceEngine(text_generation_controller=text_generation_controller)
 
 
 async def generate(
@@ -118,7 +108,7 @@ async def generate(
             prev_idx = len(output.generated_text)
         print()
 
-    request_ids: List[int] = [
+    request_ids: List[str] = [
         inference_engine.add_request(prompt=prompt, sampling_params=sampling_params, streaming=True)
         for prompt in prompts
     ]
@@ -167,12 +157,12 @@ def main():
 
     # Set up model and load checkpoint
     if args.model_provider == "gpt":
-        model_builder = gpt_builder
+        model_provider = gpt_model_provider
     elif args.model_provider == "mamba":
-        model_builder = mamba_builder
+        model_provider = mamba_model_provider
     else:
         raise ValueError(f"Invalid model provider {args.model_provider}")
-    model = get_model(partial(model_provider, model_builder), wrap_with_ddp=False)
+    model = get_model(model_provider, wrap_with_ddp=False)
     load_checkpoint(model, None, None, strict=False)
     model = model[0]
 
@@ -187,14 +177,10 @@ def main():
         top_n_logprobs=args.top_n_logprobs,
     )
 
-    if args.legacy_tokenizer:
-        tokenizer = get_tokenizer()
-    else:
-        tokenizer = build_tokenizer(args)
-    requests = build_requests(args, tokenizer)
+    requests = build_requests(args, get_tokenizer())
     prompts = [r.prompt_text for r in requests]
 
-    if args.cuda_graph_impl == "local":
+    if args.enable_cuda_graph:
         print(f"Running warmup for CUDA graphs...")
         inference_engine.generate(
             prompts=["warmup"], sampling_params=SamplingParams(num_tokens_to_generate=10)
@@ -211,14 +197,14 @@ def main():
     end_time = time.perf_counter()
     latency = end_time - start_time
 
-    if torch.distributed.get_rank() == 0 and args.output_path:
-        results_output = {}
+    if torch.distributed.get_rank() == 0:
         for idx, result in enumerate(results):
+            print(f' \n------------- RESULT FOR PROMPT {idx} --------------- ')
             result_dict = {
+                'id': result.request_id,
                 'input_prompt': result.prompt,
                 'generated_text': result.generated_text,
-                'generated_tokens': result.generated_tokens.tolist(),
-                'tpot': result.tpot,
+                'generated_tokens': result.generated_tokens,
                 'latency': latency,
             }
             if sampling_params.top_n_logprobs > 0:
@@ -226,10 +212,14 @@ def main():
             if sampling_params.return_log_probs:
                 response_logprobs = result.prompt_log_probs + result.generated_log_probs
                 result_dict["logprobs"] = response_logprobs
-            results_output[result.request_id] = result_dict
 
-        with open(args.output_path, 'w') as f:
-            json.dump(results_output, f)
+        # Write results to JSON. Primarily used for functional testing.
+        if args.output_path:
+            # Tensors cannot be serialized so we move these to CPU
+            result_dict['generated_tokens'] = result_dict['generated_tokens'].cpu().numpy().tolist()
+            results_as_json = json.dumps(result_dict)
+            with open(args.output_path, 'w') as f:
+                json.dump(results_as_json, f)
 
     # Print unique prompts + outputs.
     if torch.distributed.get_rank() == 0:
@@ -257,7 +247,7 @@ def main():
     print_rank_0(
         "static | cg %d | %s | reqs %d [ batch %d ] ... mem %.1f/%.1f ... time %.3f."
         % (
-            args.cuda_graph_impl == "local",
+            args.enable_cuda_graph,
             (
                 f"<user prompts>"
                 if args.prompts
@@ -276,16 +266,8 @@ def main():
             latency,
         )
     )
-    # Force immediate process exit to bypass torchrun's atexit NCCL teardown when
-    # CUDA graphs have captured collectives (see PyTorch issue #115388).  This can
-    # sometimes lead to hangs in the atexit handler.
-    # We do this only when CUDA graphs are enabled.
-    if args.cuda_graph_impl != "none":
-        print(f"[main] rank {torch.distributed.get_rank()}: finished", flush=True)
-        os._exit(0)
-    else:
-        torch.distributed.destroy_process_group()
 
+    torch.distributed.destroy_process_group()
 
 
 if __name__ == "__main__":

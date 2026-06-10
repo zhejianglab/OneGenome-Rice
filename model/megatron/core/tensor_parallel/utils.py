@@ -10,12 +10,9 @@ from megatron.core.utils import (
     is_torch_min_version,
 )
 
-try:
-    if is_torch_min_version("1.13.0"):
-        dist_all_gather_func = torch.distributed.all_gather_into_tensor
-    else:
-        dist_all_gather_func = torch.distributed._all_gather_base
-except Exception:
+if is_torch_min_version("1.13.0"):
+    dist_all_gather_func = torch.distributed.all_gather_into_tensor
+else:
     dist_all_gather_func = torch.distributed._all_gather_base
 
 
