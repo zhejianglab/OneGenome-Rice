@@ -1,0 +1,134 @@
+# ================= 模型配置 =================
+model:
+  # 基因大模型的本地路径，用于加载模型权重和配置文件
+  path: "/mnt/project/model/rice_1B_stage2_8k_hf"
+  # 模型名称标识，通常用于日志记录或结果命名
+  name: "rice_1B_stage2_8k_hf"
+  # 指定使用的隐藏层数量。
+  # 注意：这通常对应于模型架构的层数，或者在提取特征时指定提取哪几层的输出
+  hidden_layers: 12
+
+# ================= 运行实例配置 =================
+run:
+  # 当前运行名称。设置为 auto 会在启动时自动生成时间戳名称
+  name: "default"
+  # 是否将 embedding 也按 run 隔离保存
+  # false: 共享 embedding 缓存（推荐）
+  # true: 每次 run 独立 embedding
+  isolate_embeddings: false
+
+# ================= 数据处理与切片配置 =================
+data_process:
+  # FASTA格式基因组数据的根目录
+  fasta_root: "/mnt/rice/data/OsGenos"
+  # 数据集相关信息的存放目录
+  dataset_dir: "data"
+  # 数据集元信息文件路径（可能包含数据集描述、标签等）
+  dataset_feature_path: "data/datasets_info.yaml"
+  
+  # 定义具体的数据集配置，这里定义了两个不同的数据集/实验设置
+  datasets: 
+    # --- 数据集 1: rice_introgression ---
+    rice_introgression:
+        # 标签配置
+        label:
+          # 粳稻 (Japonica) 的标签
+          japonica: [1, 0]
+          # 籼稻 (Indica) 的标签
+          indica: [0, 1]
+        # 训练集配置
+        train: 
+          # 粳稻 (Japonica) 的训练数据文件列表
+          japonica: 
+            - "33cell/T2T-NIP.genome.fa"
+            - "88genoresearch/TG22.fixed.fa"
+          # 籼稻 (Indica) 的训练数据文件列表
+          indica: 
+            - "33cell/G630.genome.fa"
+            - "88genoresearch/TG13.fixed.fa"
+          # 切片窗口大小：8000bp，即模型每次读取的序列长度
+          window_size: 8000
+          # 滑动步长：4000bp。
+          # 意味着窗口之间有 8000-4000=4000bp 的重叠 (Overlap)
+          step_size: 4000
+        
+        # 测试集配置
+        test:  
+          japonica: 
+            - "251cellresearch/genome/NH060_O.sati_AA.genome.fa"
+          indica: 
+            - "251cellresearch/genome/NH070_O.sati_AA.genome.fa"
+          window_size: 8000
+          # 测试集步长为8000，意味着无重叠切片 (Non-overlapping)
+          step_size: 8000
+          # 是否仅保留唯一的窗口（去重），true表示不允许重复切片，false表示允许重叠切片
+          unique_windows: true
+
+    # --- 数据集 2: rice_introgression_1 ---
+    # 这个数据集使用了不同的滑动步长，可能是为了做对比实验
+    rice_introgression_1:
+        label:
+          japonica: [1, 0]
+          indica: [0, 1]
+        train:
+          japonica: 
+            - "33cell/T2T-NIP.genome.fa"
+            - "88genoresearch/TG22.fixed.fa"
+          indica: 
+            - "33cell/G630.genome.fa"
+            - "88genoresearch/TG13.fixed.fa"
+          window_size: 8000
+          # 步长2000，意味着有更高的重叠率 (75% overlap)
+          step_size: 2000
+          unique_windows: false
+        test:
+          japonica: 
+            - "251cellresearch/genome/NH060_O.sati_AA.genome.fa"
+          indica: 
+            - "251cellresearch/genome/NH070_O.sati_AA.genome.fa"
+          window_size: 8000
+          step_size: 4000
+          unique_windows: true # 这里开启了去重
+
+# ================= Embedding 提取配置 =================
+embedding:
+  # 提取出的向量 (Embedding) 保存目录
+  output_dir: "embedding_path"
+  # 批处理大小：每次处理 50000 个切片数据，用于控制内存占用
+  extract_split: 50000
+  # 指定从模型的哪些层提取特征。
+  # [12] 表示提取第12层（通常是最后一层）的输出作为特征向量
+  layers: [12]
+  # 向量拼接的维度设置。0 通常表示在 batch 维度或序列维度上进行拼接/池化
+  pooled_embeddings_cat_dim: 0
+
+# ================= 运行环境配置 =================
+environment:
+  # 随机种子，保证实验结果可复现
+  seed: 42
+  # 指定使用的 GPU 编号，[0, 1] 表示使用第0号和第1号显卡
+  gpu_list: [0, 1]
+  # 训练或推理时的批次大小
+  batch_size: 8
+  # 计算设备
+  device: "cuda"
+
+# ================= 分类器配置 =================
+classifiers:
+  # 指定分类器类型：RF 代表随机森林
+  classifier_type: "RF"
+  
+  # 随机森林的具体参数
+  RF:
+    n_estimators: 1000  # 森林中树的数量
+    random_state: 42    # 随机种子
+  
+  # 预测阶段的配置
+  prediction:
+    threshold: 0.8     # 分类阈值
+
+# ================= 输出结果配置 =================
+output:
+  # 最终测试结果、评估报告保存的目录
+  result_dir: "results_path"
+

@@ -1,0 +1,2 @@
+"""Foundation model domain."""
+

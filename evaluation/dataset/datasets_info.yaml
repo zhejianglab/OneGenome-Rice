@@ -1,0 +1,365 @@
+AgroNT Evaluation Task:
+  - chromatin_access_MH63_agront
+  - chromatin_access_ZS97_agront
+  - poly_a_japonica_agront
+  - poly_a_indica_agront
+  - bulk_gene_exp_agront
+
+Short-sequence Task:
+  - chromatin_access_512
+  - Epigenetic_Marks_Prediction-Histone
+  - smallRNA
+  - splice_sites_labels
+  - RiceVar_512
+  - enhancer_strength
+
+Long-sequence Task:
+  - enhancer_regions
+  - lncRNA
+  - rice_nlr
+  - RiceVar_6k
+  - RiceVar_8k
+
+Single-nucleotide Task:
+  - CDS_multilabel
+  - bulk_single_base_Callus
+
+Sweep Region Identification Task:
+  - sweep_region_psr
+  - sweep_region_sor
+  - sweep_region_8k
+  - sweep_region_32k
+  - sweep_region_100k
+
+Varieties Classification Task:
+  - varieties_classification_8k
+  - varieties_classification_32k
+  - varieties_classification_128k
+
+
+
+dataset_feature:
+  chromatin_access_MH63_agront:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test','eval']
+    sample_num:  100000
+    min_length:  1000
+    max_length:  1000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+  
+  chromatin_access_ZS97_agront:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test','eval']
+    sample_num:  100000
+    min_length:  1000
+    max_length:  1000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+  
+  poly_a_japonica_agront:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  140853
+    min_length:  400
+    max_length:  400
+    dataset_ratio:  [0.86, 0.14]
+    label_train_counter:  [(0, 80414), (1, 40207)]
+    label_test_counter:  [(0, 13488), (1, 6744)]
+  
+  poly_a_indica_agront:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  114915
+    min_length:  400
+    max_length:  400
+    dataset_ratio:  [0.85, 0.15]
+    label_train_counter:  [(0, 65426), (1, 32713)]
+    label_test_counter:  [(0, 11184), (1, 5592)]
+  
+  bulk_gene_exp_agront:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: regression
+    data_split: ['train', 'test','eval']
+    sample_num:  38648
+    min_length:  6000
+    max_length:  6000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+  
+  chromatin_access_512:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test','eval']
+    sample_num:  9991
+    min_length:  511
+    max_length:  511
+    dataset_ratio:  [0.8, 0.1, 0.1]
+
+  Epigenetic_Marks_Prediction-Histone:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test', 'eval']
+    sample_num:  100000
+    min_length:  708
+    max_length:  1024
+    dataset_ratio:  [0.80, 0.10, 0.10]
+
+  smallRNA:
+   seq_for_item: 1
+   seq_key: sequence
+   label_key: label
+   eval_task: classification
+   data_split: ['train', 'test', 'eval']
+   sample_num:  189654
+   min_length:  16
+   max_length:  366
+   dataset_ratio:  [0.80, 0.10, 0.10]
+   label_train_counter:  [(0, 79942), (1, 71780)]
+   label_test_counter:  [(0, 10085), (1, 8880)]
+   label_eval_counter:  [(0, 9973), (1, 8993)]
+
+  splice_sites_labels:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test', 'eval']
+    sample_num:  100000
+    min_length:  399
+    max_length:  399
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 72720), (1, 13788), (2, 13492)]
+    label_test_counter:  [(0, 6652), (1, 1728), (2, 1620)]
+    label_eval_counter:  [(0, 6603), (1, 1727), (2, 1670)]
+
+  RiceVar_512:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  14979
+    min_length:  512
+    max_length:  512
+    dataset_ratio:  [0.90, 0.10]
+    label_train_counter:  [(0, 11667), (1, 1813)]
+    label_test_counter:  [(0, 1312), (1, 187)]
+
+  enhancer_strength:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: regression
+    data_split: ['train', 'test', 'eval']
+    sample_num:  12539
+    min_length:  700
+    max_length:  700
+    dataset_ratio:  [0.8, 0.1, 0.1]
+
+  enhancer_regions:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  10822
+    min_length:  367
+    max_length:  5803
+    dataset_ratio:  [0.71, 0.29]
+    label_train_counter:  [(0, 3833), (1, 3833)]
+    label_test_counter:  [(0, 1578), (1, 1578)]
+
+  lncRNA:
+   seq_for_item: 1
+   seq_key: sequence
+   label_key: label
+   eval_task: classification
+   data_split: ['train', 'test', 'eval']
+   sample_num:  3238
+   min_length:  201
+   max_length:  6000
+   dataset_ratio:  [0.80, 0.10, 0.10]
+   label_train_counter:  [(0, 1643), (1, 947)]
+   label_test_counter:  [(0, 201), (1, 124)]
+   label_eval_counter:  [(0, 208), (1, 115)]
+
+  rice_nlr:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test','eval']
+    sample_num:  22114
+    min_length:  156
+    max_length:  6000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 12974), (1, 4717)]
+    label_test_counter:  [(0, 1630), (1, 582)]
+    label_eval_counter:  [(0, 1616), (1, 595)]
+
+  RiceVar_6k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  19979
+    min_length:  6000
+    max_length:  6000
+    dataset_ratio:  [0.90, 0.10]
+    label_train_counter:  [(0, 16209), (1, 1773)]
+    label_test_counter:  [(0, 1773), (1, 224)]
+
+  RiceVar_8k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  14955
+    min_length:  8192
+    max_length:  8192
+    dataset_ratio:  [0.90, 0.10]
+    label_train_counter:  [(0, 11658), (1, 1777)]
+    label_test_counter:  [(0, 1300), (1, 220)]
+
+  CDS_multilabel:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test']
+    sample_num:  40396
+    min_length:  512
+    max_length:  512
+    dataset_ratio:  [0.62, 0.38]
+
+  bulk_single_base_Callus:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: regression
+    data_split: ['train', 'test','eval']
+    sample_num:  123989
+    min_length:  6000
+    max_length:  6000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+
+  sweep_region_psr:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test', 'eval']
+    sample_num:  57836
+    min_length:  6000
+    max_length:  6000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 30776), (1, 15492)]
+    label_test_counter:  [(0, 3920), (1, 1865)]
+    label_eval_counter:  [(0, 3858), (1, 1925)]
+
+  sweep_region_sor:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test', 'eval']
+    sample_num:  48620
+    min_length:  6000
+    max_length:  6000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 25892), (1, 13004)]
+    label_test_counter:  [(0, 3271), (1, 1591)]
+    label_eval_counter:  [(0, 3249), (1, 1613)]
+
+  sweep_region_8k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  21579
+    min_length:  8000
+    max_length:  8000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 11498), (1, 5765)]
+    label_test_counter:  [(0, 1413), (1, 744)]
+    label_eval_counter:  [(0, 1475), (1, 684)]
+
+  sweep_region_32k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  9840
+    min_length:  32000
+    max_length:  32000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 5262), (1, 2610)]
+    label_test_counter:  [(0, 656), (1, 328)]
+    label_eval_counter:  [(0, 642), (1, 342)]
+
+  sweep_region_100k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: classification
+    data_split: ['train', 'test']
+    sample_num:  7200
+    min_length:  100000
+    max_length:  100000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+    label_train_counter:  [(0, 3859), (1, 1901)]
+    label_test_counter:  [(0, 472), (1, 248)]
+    label_eval_counter:  [(0, 469), (1, 251)]
+
+  varieties_classification_8k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test','eval']
+    sample_num:  300013
+    min_length:  8000
+    max_length:  8000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+
+  varieties_classification_32k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test','eval']
+    sample_num:  149906
+    min_length:  32000
+    max_length:  32000
+    dataset_ratio:  [0.8, 0.1, 0.1]
+
+  varieties_classification_128k:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split: ['train', 'test','eval']
+    sample_num:  149474
+    min_length:  128000
+    max_length:  128000
+    dataset_ratio:  [0.8, 0.1, 0.1]

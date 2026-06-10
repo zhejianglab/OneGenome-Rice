@@ -1,0 +1,102 @@
+# =============================================================================
+# Unified training config (use with: python training.py this_file.yaml)
+# training.per_device_train_batch_size is required.
+#                 fusion = bidirectional cross-attn at L/4 + post-fusion bottleneck + U-Net upsample
+#                         + full-res dual-skip (DNA+ATAC) with learnable weights
+# Dataset block: training_data = list of {name, rna_path_*, atac_path, optional chromosome}.
+# =============================================================================
+
+
+
+# -- Output (checkpoints, logs, train_index CSV); same as <run_root>/model when using run.py --------
+output_training_dir: "/workspace/model/test1/model"
+
+# -- Pretrained model ----------------------------------------------------------
+model_path: "/workspace/foundation/rice_1B_32k_hf/"
+model_torch_dtype: "bfloat16"
+tokenizer_torch_dtype: null
+
+# -- Reference genome ----------------------------------------------------------
+genome_fasta: "/workspace/ref/MH63/MH63.fa"
+
+# -- Genomic regions + signals (test_data in infer.yaml uses the same entry shape) ---
+chromosome: "chr3"
+# cap_expression_quantile: 0.999   # optional [0,1]; RNA upper-cap + track_mean from capped signal (match infer.yaml)
+
+training_data:
+  - name: "SAM2_MH63_1"
+    rna_path_plus:  "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_plus.q30.CPM.bw"
+    rna_path_minus: "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_minus.q30.CPM.bw"
+    atac_path:      "/workspace/ATAC/10.process/ATAC_SAM2_MH63_1/ATAC_SAM2_MH63_1.q30.bin1.RPGC.bw"
+    # chromosome: "chr3"   # optional override when it differs from top-level chromosome
+
+# -- Model architecture --------------------------------------------------------
+atac_encoder_output_dim: 1024
+# target_len: 32000   # optional; window length (bp). Default 32000 if omitted.
+# overlap_len: 16000  # optional; defaults to target_len // 2 when omitted.
+# training.per_device_train_batch_size is required (see below).
+
+# -- Predictor -----------------------------------------------------------------
+predictor:
+  type: fusion
+  # fusion-only (entropy regularizer as a fraction of MSE, using normalized entropy H/log(K)):
+  # loss = mse - mse.detach() * (fusion_gate_entropy_frac * H4_norm + skip_gate_entropy_frac * H2_norm)
+  # fusion_gate_entropy_frac: 0.01  # set >0 to encourage more even 4-way fusion gate
+  # skip_gate_entropy_frac: 0.01    # set >0 to encourage more even 2-way skip gate
+  # unfreeze_base_last_layer: false   # fusion: train last DNA transformer block (default frozen base)
+
+# -- Training hyperparameters --------------------------------------------------
+training:
+  # learning_rate: 8.0e-5
+  # Discriminative LR (two param groups: base last layer vs downstream head).
+  # When enabled, unset *_backbone/_head fall back to learning_rate.
+  discriminative_lr: true
+  learning_rate_backbone: 3.0e-5
+  learning_rate_head: 1.5e-4
+  #
+  # LR scheduler (Hugging Face `TrainingArguments`).
+  # Defaults match current behavior: linear warmup + linear decay.
+  #
+  # Available scheduler options (transformers SchedulerType):
+  # - linear (default)
+  # - cosine
+  # - cosine_with_restarts
+  # - polynomial
+  # - constant
+  # - constant_with_warmup
+  # - inverse_sqrt
+  # - reduce_lr_on_plateau
+  # - cosine_with_min_lr
+  # - cosine_warmup_with_min_lr
+  # - warmup_stable_decay
+  #
+  lr_scheduler_type: linear
+  #
+  # Optional floor (only for lr_scheduler_type: cosine_with_min_lr or cosine_warmup_with_min_lr;
+  # ignored for other schedulers — do not put min_lr_rate in lr_scheduler_kwargs for linear/cosine, etc.).
+  # - min_lr_rate: minimum learning rate as a ratio of the initial lr (default 0.0 → decays to 0).
+  # min_lr_rate: 0.0
+  #
+  # Advanced: pass through extra scheduler kwargs.
+  # Examples:
+  # - cosine / cosine_with_restarts: {"num_cycles": 0.5}
+  # - polynomial: {"lr_end": 1.0e-6, "power": 1.0}
+  # - cosine_with_min_lr: {"min_lr_rate": 0.05, "num_cycles": 0.5}
+  # lr_scheduler_kwargs: {}
+  per_device_train_batch_size: 5
+  gradient_accumulation_steps: 20
+  # Optional: scale grad accum with DDP world_size so global batch ~ matches a world_size=1 recipe
+  # (G' = max(1, round(G / world_size)); keep learning_rate unchanged). Reference is fixed in code.
+  scale_gradient_accumulation_for_world_size: true
+  num_train_epochs: 80
+  weight_decay: 0.01
+  max_grad_norm: 1.0   # HF Trainer gradient clipping (default 1.0); set 0 to disable clipping
+  logging_steps: 1
+  optim: "adafactor"
+  # Checkpoint saving options (mutually exclusive unless both are 1):
+  # - Default: one save at end of each epoch (save_strategy: epoch)
+  # - save_num_per_epoch: K   # save ~K times per epoch (uses save_strategy=steps)
+  # - save_per_n_epoch: N     # save every N epochs (end of epoch N, 2N, 3N, ...)
+  save_per_n_epoch: 5
+  save_total_limit: 5
+  warmup_ratio: 0.05

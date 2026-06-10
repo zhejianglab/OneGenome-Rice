@@ -1,0 +1,2 @@
+"""Embedding feature extraction domain."""
+

@@ -1,0 +1,27 @@
+# ================= 仅测试（外部模型 x 外部embedding）=================
+test:
+  # 分类器文件列表（.rf.pkl），支持多个
+  classifier_paths:
+    - "/mnt/project/results_path/rice_1B_stage2_8k_hf/last_epoch_model/varieties_classification_jap10-ind10_8k-12layer.rf.pkl"
+
+  # 待测试embedding文件列表（.pt），支持多个
+  embedding_paths:
+    - "/mnt/project/embedding_path/rice_1B_stage2_8k_hf/varieties_classification_YF47_8k_4k_20260417-12layer_test.pt"
+
+  # 输出目录：每个组合+阈值输出一个TSV，并生成summary.tsv
+  output_dir: "results_path/only_test"
+
+  # 配对方式：
+  # cross = 每个分类器测试所有embedding（笛卡尔积）
+  # zip   = 一一对应配对（要求两个列表长度相同）
+  pairing: "cross"
+
+  # 预测阈值，可设置多个
+  thresholds: [0.5, 0.8]
+
+  # 与训练时一致的pool方式（0=mean pooling, 1=flatten）
+  pooled_embeddings_cat_dim: 0
+
+  # torch.load 的 map_location
+  device: "cpu"
+

@@ -1,0 +1,38 @@
+# 序列基准测试工具依赖包
+# Seq Benchmarks Requirements
+
+# 深度学习框架
+torch>=2.0.0
+transformers>=4.21.0
+
+# 数据处理和分析
+pandas>=1.5.0
+numpy>=1.21.0
+scipy>=1.9.0
+
+# 机器学习
+scikit-learn>=1.1.0
+
+# 可视化
+matplotlib>=3.5.0
+
+# 实验跟踪和监控
+wandb>=0.13.0
+
+# 进度条
+tqdm>=4.64.0
+
+# YAML配置文件解析
+PyYAML>=6.0
+
+# GPU加速 (根据您的CUDA版本选择)
+# 如果使用CUDA 11.8+，请安装:
+# torch>=2.0.0+cu118 -f https://download.pytorch.org/whl/torch_stable.html
+
+# 如果使用CPU版本，请安装:
+# torch>=2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+
+# 可选依赖 (用于特定功能)
+# jupyter>=1.0.0              # 用于运行notebook文件
+# seaborn>=0.11.0             # 用于更美观的数据可视化
+# plotly>=5.0.0               # 用于交互式可视化

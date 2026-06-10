@@ -1,0 +1,14 @@
+numpy==2.2.6
+scipy==1.17.1
+pandas==2.2.3
+
+scikit-learn==1.8.0
+joblib==1.5.3
+
+torch==2.10.0
+torchvision==0.25.0
+torchaudio==2.10.0
+
+transformers==4.57.6
+sentencepiece==0.2.1
+accelerate==1.13.0

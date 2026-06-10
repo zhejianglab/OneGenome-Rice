@@ -1,0 +1,21 @@
+support_dataset:
+- rice_introgression_japonica-indica
+default_dataset:
+- none
+genomic_benchmark_dataset:
+- none
+nt_benchmark_dataset:
+- none
+long_sequence_dataset:
+- none
+super_long_sequence_dataset:
+- none
+dataset_feature:
+  rice_introgression_japonica-indica:
+    seq_for_item: 1
+    seq_key: sequence
+    label_key: label
+    eval_task: labels
+    data_split:
+    - train
+    - test

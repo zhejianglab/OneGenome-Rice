@@ -1,0 +1,154 @@
+# =============================================================================
+# Unified experiment config (run.py, or inference-only pieces)
+# run.py: uses output_base_dir as run root; writes config/train.yaml with output_training_dir=<run>/model
+# Direct training.py: prefer config.example/training.yaml (output_training_dir)
+# inference.py: test_data, ckpt_path, 
+# =============================================================================
+
+# =============================================================================
+# Section 1: General Configuration
+# =============================================================================
+
+# Run root (flags, reg/, test/, config/); training checkpoints live under <output_base_dir>/model when using run.py
+# output_base_dir: "/workspace/model/test1/"
+
+# Pretrained DNA model (Hugging Face format)
+model_path: "/workspace/foundation/rice_1B_32k_hf/"
+model_torch_dtype: "bfloat16"
+tokenizer_torch_dtype: null
+
+# Reference genome (default). You can override per entry in training_data/test_data
+# by setting `genome_fasta` inside that entry.
+genome_fasta: "/workspace/ref/MH63/MH63.fa"
+chromosome: "chr3"
+# cap_expression_quantile: 0.999   # optional [0,1]; RNA upper-cap + index track_mean (match training.yaml / infer.yaml; run.py forwards to inference)
+
+# Model architecture
+atac_encoder_output_dim: 1024
+
+# Window / target length (bp). Historical default: 32000.
+# Controls index window_size, dataset padding/truncation length, and downstream midpoint (target_len//2).
+target_len: 32000
+# overlap_len: 16000  # optional; defaults to target_len // 2 when omitted
+
+# Inference windows per GPU forward pass.
+inference_batch_size: 1
+
+# GPU processes for training.py and inference.py (run.py uses torch.distributed.run when > 1).
+# Override on the CLI: run.py --nproc-per-node 4 -c experiment.yaml
+# nproc_per_node: 1
+
+predictor:
+  type: fusion
+# Or for fusion checkpoints (bidir cross-attn @ L/4 + post-fusion bottleneck + U-Net + dual-skip):
+# predictor:
+#   type: fusion
+#   # fusion_gate_entropy_frac: 0.01
+#   # skip_gate_entropy_frac: 0.01
+#   # unfreeze_base_last_layer: false
+# (Region-masked block mode is not supported in this repo version.)
+#
+# (Strand-split mode is not supported in this repo version.)
+
+# =============================================================================
+# Section 2: Dataset Configuration
+# =============================================================================
+
+# For training: use training_data
+training_data:
+  - name: "SAM2_MH63_1"
+    rna_path_plus:  "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_plus.q30.CPM.bw"
+    rna_path_minus: "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_minus.q30.CPM.bw"
+    atac_path:      "/workspace/ATAC/10.process/ATAC_SAM2_MH63_1/ATAC_SAM2_MH63_1.q30.bin1.RPGC.bw"
+    # chromosome: "chr3"   # optional per-entry override
+    # genome_fasta: "/workspace/ref/MH63/MH63.fa"  # optional per-entry override (else uses top-level genome_fasta)
+
+# For inference: use test_data
+test_data:
+  - name: "SAM2_MH63_1"
+    rna_path_plus:  "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_plus.q30.CPM.bw"
+    rna_path_minus: "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_minus.q30.CPM.bw"
+    atac_path:      "/workspace/ATAC/10.process/ATAC_SAM2_MH63_1/ATAC_SAM2_MH63_1.q30.bin1.RPGC.bw"
+    # chromosome: "chr3"   # optional per-entry override
+    # genome_fasta: "/workspace/ref/MH63/MH63.fa"  # optional per-entry override (else uses top-level genome_fasta)
+
+# =============================================================================
+# Section 3: Training hyperparameters
+# =============================================================================
+
+training:
+  # learning_rate: 8.0e-5
+  # Discriminative LR (two param groups: base last layer vs downstream head).
+  # When enabled, unset *_backbone/_head fall back to learning_rate.
+  discriminative_lr: true
+  learning_rate_backbone: 3.0e-5
+  learning_rate_head: 1.5e-4
+  #
+  # LR scheduler (Hugging Face `TrainingArguments`).
+  # Defaults match current behavior: linear warmup + linear decay.
+  #
+  # Available scheduler options (transformers SchedulerType):
+  # - linear (default)
+  # - cosine
+  # - cosine_with_restarts
+  # - polynomial
+  # - constant
+  # - constant_with_warmup
+  # - inverse_sqrt
+  # - reduce_lr_on_plateau
+  # - cosine_with_min_lr
+  # - cosine_warmup_with_min_lr
+  # - warmup_stable_decay
+  #
+  lr_scheduler_type: linear
+  #
+  # Advanced: pass through extra scheduler kwargs.
+  # Examples:
+  # - cosine / cosine_with_restarts: {"num_cycles": 0.5}
+  # - polynomial: {"lr_end": 1.0e-6, "power": 1.0}
+  # - cosine_with_min_lr: {"min_lr_rate": 0.05, "num_cycles": 0.5}
+  # lr_scheduler_kwargs: {}
+  warmup_ratio: 0.05
+  per_device_train_batch_size: 5
+  gradient_accumulation_steps: 20
+  # Optional: scale grad accum with world_size — see config.example/training.yaml comments
+  scale_gradient_accumulation_for_world_size: true
+  num_train_epochs: 80
+  weight_decay: 0.01
+  # max_grad_norm: 1.0   # HF Trainer gradient clipping (default 1.0); set 0 to disable clipping
+  logging_steps: 1
+  optim: "adafactor"
+  # Checkpoint saving options (mutually exclusive unless both are 1):
+  # - save_num_per_epoch: K   # save ~K times per epoch (uses save_strategy=steps)
+  # - save_per_n_epoch: N     # save every N epochs (end of epoch N, 2N, 3N, ...)
+  # save_num_per_epoch: 4
+  # save_per_n_epoch: 3
+  # save_num_per_epoch: 1
+  save_per_n_epoch: 5
+  save_total_limit: 5
+
+
+# =============================================================================
+# Section 4: Inference Configuration 
+# =============================================================================
+
+# run.py only: which checkpoints under <output_base_dir>/model/ to use for reg/ and test/ inference.
+# pick checkpoints like reversed(checkpoint_list)[::checkpoint_stride][:pick_n]).
+
+inference_checkpoints:
+  pick_n: 3
+  checkpoint_stride: 1
+
+# Checkpoint path for inference
+# ckpt_path: "/workspace/model/test1/model/checkpoint-1444/model.safetensors"
+
+# Output directory for inference predictions
+# output_eval_dir: "/workspace/model/test1/reg1"
+
+# Output format flags
+save_csv: true
+save_pickle: true
+# run.py only: after inference, run collect_stats.py (parallel calc_metrics + stats.wide CSV).
+collect_stats: true
+# inference_batch_size: 1  # optional; defaults to batch_size when omitted
+

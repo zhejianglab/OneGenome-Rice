@@ -1,0 +1,120 @@
+# Model path
+model_path: "path_to_your_model_checkpoint"
+
+# If no model checkpoint is provided and downstream tasks are performed using precomputed embeddings, specify the model name
+# model_name: ""
+
+# Path to the dataset feature configuration file
+datasets_feature_path: "../dataset/datasets_info.yaml"
+
+wandb_report: False
+wandb_project: "mlp"
+wandb_entity: "wandb_entity"
+wandb_online: False
+
+# If no model checkpoint is used and embeddings are directly utilized, specify the number of layers in the model
+# num_layers: 12
+
+# Evaluation datasets
+eval_datasets:
+  # - chromatin_access_MH63_agront
+  # - chromatin_access_ZS97_agront
+  # - poly_a_japonica_agront
+  # - poly_a_indica_agront
+  # - bulk_gene_exp_agront
+
+  - chromatin_access_512
+  - Epigenetic_Marks_Prediction-Histone
+  - smallRNA
+  - splice_sites_labels
+  - RiceVar_512
+  - enhancer_strength
+
+  # - enhancer_regions
+  # - lncRNA
+  # - rice_nlr
+  # - RiceVar_6k
+  # - RiceVar_8k
+
+  # - CDS_multilabel
+  # - bulk_single_base_Callus
+
+  # - sweep_region_psr
+  # - sweep_region_sor
+  # - sweep_region_8k
+  # - sweep_region_32k
+  # - sweep_region_100k
+
+  # - varieties_classification_8k
+  # - varieties_classification_32k
+  # - varieties_classification_128k
+
+# GPU configuration
+# gpu_list: [0,1]
+layer_to_eval: [12]
+
+# Random seed
+seed: 42
+
+#  Path to save embedding
+embedding_output_dir: "./embedding_path"
+# Data splitting granularity during embedding extraction
+embedding_extract_split: 50000
+batch_size: 8
+
+# Path to save evaluation results
+eval_result_path: "./results_path"
+
+# Dataset directory
+dataset_path: "../dataset/"
+
+# Classifier type
+classifer_type: "MLP"
+
+# Strategy for merging multiple sequences (e.g., diploid or family-level) into a single label
+# (1: concatenation, e.g., 2×1024 → 1×2048; 0: mean pooling, e.g., n×1024 → 1024)
+pooled_embeddings_cat_dim: 0
+
+# Task scheduling
+# Total computational weight allowed per GPU
+process_power_per_gpu: 5
+# Weight consumed by embedding extraction tasks
+embedding_process_power: 4
+# Weight consumed by evaluation tasks
+eval_process_power: 1
+
+# MLP configuration
+mlp_dropout: 0.2
+mlp_lr: 0.0001
+mlp_epochs: 100
+save_last_epoch_model: False
+
+# Random Forest configuration
+rf_n_estimators: 100
+
+# XGBoost configuration
+xgb_n_estimators: 100
+xgb_eval_metric: 'mlogloss'
+xgb_learning_rate: 0.1
+xgb_max_depth: 6
+
+# Report generation
+# Supported classification metrics: ["accuracy","roc_auc","precision","recall","f1","mcc"]
+# Supported regression metrics: ["r2","pearsonr","spearmanr"]
+# Extract the best results for each dataset:
+# - If a row contains a single metric, extract all results from the layer with the best value of that metric.
+# - If a row contains multiple metrics, extract the best value of each metric across all layers independently.
+target_best_table:
+  - "accuracy"
+  - "roc_auc"
+  - ["roc_auc", "accuracy"]
+  - "pearsonr"
+
+# Plot line charts for each dataset (x-axis: layer)
+# - If a row contains a single metric, plot its curve across layers.
+# - If a row contains multiple metrics, the first metric is treated as the primary metric for plotting;
+#   the remaining metrics are secondary and will be shown in the legend using values from the best layer of the primary metric.
+target_layer_line_figure:
+  - ["roc_auc", "accuracy"]
+  - ["accuracy", "roc_auc"]
+  - "pearsonr"

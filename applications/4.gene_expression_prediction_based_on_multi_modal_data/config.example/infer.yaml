@@ -1,0 +1,50 @@
+# Config for inference.py
+# Run: python inference.py this_file.yaml
+# Multi-GPU: torchrun --standalone --nproc_per_node=4 inference.py this_file.yaml
+# Regions and BigWig paths: list under `test_data` (same row shape as `training_data` in training.yaml).
+# Optional: cap_expression_quantile [0,1] — must match training if used (rebuild infer_index.csv).
+
+ckpt_path: "/workspace/model/test1/model/checkpoint-1444/model.safetensors"
+output_eval_dir: "/workspace/model/test1/reg1"
+genome_fasta: "/workspace/ref/MH63/MH63.fa"
+model_path: "/workspace/foundation/rice_1B_32k_hf/"
+model_torch_dtype: "bfloat16"
+
+# ATAC encoder output dimension (must match the checkpoint)
+atac_encoder_output_dim: 1024
+
+# target_len: 32000   # optional; window length (bp). Default 32000 if omitted.
+# overlap_len: 16000  # optional; defaults to target_len // 2 when omitted.
+
+# Optional predictor (default is fusion if omitted)
+# predictor:
+#   type: fusion
+# Or for fusion checkpoints (bidir cross-attn @ L/4 + U-Net + dual-skip):
+# predictor:
+#   type: fusion
+#   # fusion_gate_entropy_frac: 0.01       # optional; must match how the checkpoint was trained
+#   # skip_gate_entropy_frac: 0.01         # optional; must match how the checkpoint was trained
+#   # unfreeze_base_last_layer: false      # must match how the checkpoint was trained
+# (Region-masked block mode is not supported in this repo version.)
+#
+# (Strand-split mode is not supported in this repo version.)
+
+chromosome: "chr3"
+# cap_expression_quantile: 0.999   # optional; must match training if used (index track_mean / cap_threshold)
+
+test_data:
+  - name: "SAM2_MH63_1"
+    rna_path_plus:  "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_plus.q30.CPM.bw"
+    rna_path_minus: "/workspace/RNA/10.process/RNA_SAM2_MH63_1/RNA_SAM2_MH63_1_minus.q30.CPM.bw"
+    atac_path:      "/workspace/ATAC/10.process/ATAC_SAM2_MH63_1/ATAC_SAM2_MH63_1.q30.bin1.RPGC.bw"
+    # chromosome: "chr3"   # optional override (defaults to top-level chromosome)
+
+# Windows per GPU forward pass.
+inference_batch_size: 1
+
+save_csv: true
+save_pickle: true
+# Optional: set calc_metrics: true to compute strand metrics inside inference.py after save
+# (default false). run.py uses collect_stats instead; standalone inference does not read collect_stats.
+# metric_region is fixed (full only); no config key.
+# (dataset_type is not used in this repo version.)
