@@ -1,2 +1,0 @@
-"""Evaluation and report domain."""
-

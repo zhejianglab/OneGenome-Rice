@@ -1,0 +1,73 @@
+model:
+  model_path: "${MNT_DEFAULT}/Workspace/hf/rice_1B_stage2_8k_hf"
+  model_name: "rice_1B_stage2_8k_hf"
+  token: null
+  pooling_strategy: "masked_mean"  # 端到端模式生效；embedding-only 时无 backbone
+
+lora:
+  use_lora: true
+  r: 16
+  alpha: 32
+  dropout: 0.1
+  target_modules:
+    - q_proj
+    - v_proj
+
+data:
+  data_dir: "${MNT_DEFAULT}/Workspace/benchmarks_rice_data/data" 
+  dataset_name: "${DATASET_NAME}"
+  split_name: 
+    train: "train"
+    eval: "eval"
+    test: "test"
+
+tokenizer:
+  use_arrow_token_cache: true
+  tokenize_dir: "${MNT_DEFAULT}/Workspace/benchmarks_rice_data/tokenize"
+  force_rebuild_arrow_cache: false
+
+embedding:
+  use_extracted_embeddings: false
+  layer: 12
+  embedding_dir: null
+  split_name: 
+    train: "train"
+    eval: "eval"
+    test: "test"
+
+train:
+  output_dir: "${MNT_DEFAULT}/Workspace/OneGenome-Rice/applications/1.identification_of_indica-japonica_introgression/results"
+  run_name: "${RUN_NAME}"
+  batch_size: 4
+  lr: 1e-5
+  dropout: 0.02
+  lr_scheduler_type: cosine # linear / cosine / polynomial
+  weight_decay: 0.01 # 0.01 是常用的权重衰减值，可以帮助模型更好地泛化
+  warmup_ratio: 0.05 # 预热步数占总训练步数的比例，常用值为 0.1 0.05
+  epochs: 4
+  lambda_contrastive: 0.1
+  sigmoid_threshold: 0.5
+  gradient_accumulation_steps: 8  # 有效 batch_size = batch_size * gradient_accumulation_steps
+  early_stopping_patience: 0  # 连续 3 个 epoch 无改进则停止
+  fp16: true # 是否使用半精度浮点数进行训练，通常在 GPU 内存有限时使用，可以加速训练并减少内存占用，但可能会导致数值不稳定
+  bf16: false # 是否使用 bfloat16 进行训练，bfloat16 是一种新的半精度格式，在某些硬件上（如 Google TPU）提供更好的数值范围和稳定性
+  dataloader_num_workers: 128 # 用于数据加载的子进程数量，通常设置为 CPU 核心数的 2-4 倍，可以加速数据加载，但过多可能会导致系统资源紧张
+  dataloader_pin_memory: true # 是否将数据加载到 CUDA 固定内存中，通常在使用 GPU 训练时设置为 True，可以加速数据传输，但可能会增加内存使用
+  dataloader_persistent_workers: true # 是否在训练过程中保持数据加载器的子进程持续运行，通常在使用多线程数据加载时设置为 True，可以减少每个 epoch 的启动时间，但可能会增加内存使用
+  ddp_find_unused_parameters: false # 在使用分布式数据并行（DDP）训练时，是否查找未使用的参数，通常设置为 False 可以提高性能，但如果模型中有未使用的参数可能会导致错误
+  ddp_backend: "nccl" # 分布式数据并行（DDP）训练的后端，常用的有 "nccl"（适用于 NVIDIA GPU）和 "gloo"（适用于 CPU 和其他 GPU）
+  eval_strategy: steps # epoch / steps - 评估策略，通常设置为 steps 可以在训练过程中定期评估模型性能，帮助监控训练进展和调整超参数
+  eval_steps: 100
+  save_strategy: steps # epoch / steps - 模型保存策略，通常设置为 steps 可以在训练过程中定期保存模型，防止意外中断导致训练成果丢失
+  save_steps: 100
+  logging_steps: 10 # 每隔多少步记录一次训练日志，通常设置为 10-100，根据训练速度和日志需求调整
+  resume_checkpoint_path: auto  # auto=自动找最新 checkpoint；具体路径=指定目录；false=从头训练
+
+
+projection:
+  dims: [1024, 512, 128]
+  use_batchnorm: false # 是否在投影头中使用批归一化（Batch Normalization），通常设置为 False 可以减少模型复杂度，但在某些情况下使用批归一化可以提高训练稳定性和性能
+
+task:
+  num_labels: 2
+  task_class: labels # labels / classification / regression

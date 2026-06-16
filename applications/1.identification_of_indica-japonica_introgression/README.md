@@ -1,155 +1,169 @@
-# **ScenarioⅠ: Identification of *indica-japonica* Introgression**
+# ScenarioⅠ: Identification of *indica*-*japonica* Introgression
 
-## **1.Task Description**
+## 1. Overview
 
-This case aims to exploit the capacity of the OGR foundation model for fine-scale inference of subspecies origin across the rice genome, enabling the identification of introgression between *indica* (*Oryza sativa* subsp. *indica*) and *japonica* (*Oryza sativa* subsp. *japonica*). Unlike traditional approaches that rely on SNP-based statistics or local sequence alignment, this study starts directly from raw genomic sequences. High-dimensional embeddings are extracted using the OGR model, upon which downstream predictive models are built. This approach enables the capture of deep genetic structural differences at the sequence level, facilitating the identification of potential introgressed regions between subspecies.
+This case aims to exploit the capacity of the OGR foundation model for fine-scale inference of subspecies origin across the rice genome, enabling the identification of introgression between *indica* (*Oryza sativa* subsp. *indica*) and *japonica* (*Oryza sativa* subsp. *japonica*). Current phylogenetic methods and SNP-based population comparison analysis are often dependent on reference genomes. They are not readily scalable to newly introduced samples without reconstructing population comparison frameworks, and may be biased in genomic regions with low sequence diversity. So we proposed an alignment- and variant-free framework based on OGR that operates directly on genome assemblies for fine-scale and robust detection of *indica*-*japonica* introgression.
 
-## **2.Data Source and Processing**
+## 2. Method
 
-This study utilizes high-quality, well-annotated assembled rice genomes with clearly defined origins, including:
-
-Data foundation: a collection of high-quality assembled rice genomes
-
-Subpopulation assignment: based on subpopulation labels from the RiceVarMap database
-
-Sample selection: samples overlapping with the 3KRGP (3K rice genome project) were selected, followed by further filtering using whole-genome variation–based principal component analysis (PCA). Finally, 10 representative samples were selected from both *indica* and temperate *japonica* groups, aiming to preserve within-subpopulation genetic diversity while minimizing potential interference from introgression introduced during breeding history. And one additional representative sample from each of *indica* and *japonica* was selected to construct an independent test set for evaluation.
-
-| Sample Name     | ID_3K          | Region      | Subpop                | Set          | DOI                        |
-| --------------- | -------------- | ----------- | --------------------- | ------------ | -------------------------- |
-| Aimakang        | B115           | China       | *Indica* I          | Training Set | 10.1038/s41588-025-02365-1 |
-| Lucaihao        | B208           | China       | *Indica* I          | Training Set | 10.1038/s41588-025-02365-1 |
-| Nantehao        | B062           | China       | *Indica* I          | Training Set | 10.1038/s41588-025-02365-1 |
-| Gang_46B        | CX10           | China       | *Indica* I          | Training Set | 10.1101/gr.276015.121      |
-| Guangluai_4     | B061           | China       | *Indica* I          | Training Set | 10.1101/gr.276015.121      |
-| TAICHUNGNATIVE1 | CX270          | China       | *Indica* I          | Training Set | 10.1101/gr.276015.121      |
-| Gui_630         | B242           | China       | *Indica* II         | Training Set | 10.1016/j.cell.2021.04.046 |
-| IR64-IL         | CX230          | China       | *Indica* II         | Training Set | 10.1016/j.cell.2021.04.046 |
-| Laozaogu        | B246           | China       | *Indica* III        | Training Set | 10.1038/s41588-025-02365-1 |
-| LUO_SI_ZHAN     | IRIS_313-11728 | China       | *Indica* III        | Training Set | 10.1101/gr.276015.121      |
-| Jindao_1        | B236           | China       | Temperate*Japonica* | Training Set | 10.1038/s41588-025-02365-1 |
-| Zhengdao_5      | B240           | China       | Temperate*Japonica* | Training Set | 10.1038/s41588-025-02365-1 |
-| Heibiao         | B001           | China       | Temperate*Japonica* | Training Set | 10.1038/s41588-025-02365-1 |
-| Annongwangeng_B | B250           | China       | Temperate*Japonica* | Training Set | 10.1101/gr.276015.121      |
-| Linguo          | B171           | Italy       | Temperate*Japonica* | Training Set | 10.1038/s41588-025-02365-1 |
-| Yueguang        | CX330          | Japan       | Temperate*Japonica* | Training Set | 10.1016/j.cell.2021.04.046 |
-| Gongchengxiang  | B045           | Japan       | Temperate*Japonica* | Training Set | 10.1038/s41588-025-02365-1 |
-| Qiutianxiaoting | B046           | Japan       | Temperate*Japonica* | Training Set | 10.1101/gr.276015.121      |
-| Qingjinzaosheng | B167           | North Korea | Temperate*Japonica* | Training Set | 10.1101/gr.276015.121      |
-| MAEKJO          | IRIS_313-10097 | South Korea | Temperate*Japonica* | Training Set | 10.1101/gr.276015.121      |
-| Heidu 4         | B081           | China       | *Indica* I          | Test Set     | 10.1038/s41588-025-02365-1 |
-| Dandongludao    | B069           | China       | Temperate*Japonica* | Test Set     | 10.1038/s41588-025-02365-1 |
-
-## **3. Task Design**
-
-### **3.1 Overall Framework**
-
-The model is built upon the OneGenome-Rice foundation model. Unlike conventional fine-tuning approaches, this study does not update the parameters of the foundation model. Instead, it directly extracts embeddings from each 8,000 bp sequence and builds a lightweight downstream predictive model based on these representations, with the core workflow as follows:
+Based on the sequence representation capabilities of the OGR foundation model, this study constructs a prediction framework that maps genomic sequences to subpopulation origin probabilities, thereby enabling the inference of ancestry introgression between *indica* and *japonica*. The overall workflow is described below:
 
 ![Overall framework and workflow](images/Introgression_Framework.png)
 
-**Data Construction and Partitioning**: Whole-genome sequences from *indica* and *japonica* rice are collected and divided into training and test sets at the individual level (10:1 ratio).
+### 2.1 Data preparation
 
-**Genomic Window Segmentation**: Each genome is partitioned into fixed-length sliding windows (8,000 bp), generating a set of sequence fragments that cover the entire genome.
+- 25 *indica* and 25 temperate *japonica* accessions from the 3KRGP collection.
+- Within each subspecies: 15 training, 5 validation, 5 test.
+- Training windows: raw sequences trimmed of trailing `N`, 8,000 bp windows, 7,000 bp stride.
+- Validation/test windows: BLAST-selected high-differentiation regions from an FST > 0.9 reference set.
+- YF47 analysis: whole-genome windows with 8,000 bp window and 8,000 bp stride.
+- *Chalk5* fine-scale analysis: 8,000 bp windows with 100 bp stride.
 
-**Sequence Representation Extraction**: Each 8,000 bp sequence fragment is encoded using the OGR foundation model to obtain high-dimensional embedding representations.
+Each subspecies has 15 training, 5 validation, and 5 test samples. The full sample list is shown below.
 
-**Downstream Modeling**: A random forest model is trained on these embeddings to learn the mapping from sequence representations to subpopulation assignment probabilities ($P_{\textit{indica}}$: probability of belonging to *indica*; $P_{\textit{japonica}}$: probability of belonging to *japonica*).
+| Sample Name | ID_3K | Region | Subpop | Set |
+| :--- | :--- | :--- | :--- | :--- |
+| Funingzipigengzi | B067 | China | *Indica* | Train Set |
+| Jinbaoyin | B075 | China | *Indica* | Train Set |
+| Minbeiwanxian | B076 | China | *Indica* | Train Set |
+| Esiniu | B079 | China | *Indica* | Train Set |
+| Xugunuo | B085 | China | *Indica* | Train Set |
+| SanQishiluo | B088 | China | *Indica* | Train Set |
+| Qitougu | B093 | China | *Indica* | Train Set |
+| Xianggu | B108 | China | *Indica* | Train Set |
+| Xiaobaimi | B132 | China | *Indica* | Train Set |
+| Honggenghangu3 | B135 | China | *Indica* | Train Set |
+| Jiefangxian | B198 | China | *Indica* | Train Set |
+| Biwusheng | B203 | China | *Indica* | Train Set |
+| Xuanenchangtanqingzhan | B214 | China | *Indica* | Train Set |
+| Menjiagao 1 | B227 | China | *Indica* | Train Set |
+| Laozaogu | B246 | China | *Indica* | Train Set |
+| Heidu 4 | B081 | China | *Indica* | Validation Set |
+| Mowangguneiza | B095 | China | *Indica* | Validation Set |
+| Aizizhan | B131 | China | *Indica* | Validation Set |
+| Lucaihao | B208 | China | *Indica* | Validation Set |
+| Xiangdao | B244 | China | *Indica* | Validation Set |
+| Qiuqianbai | B072 | China | *Indica* | Test Set |
+| Jinxibai2 | B073 | China | *Indica* | Test Set |
+| Hanmadao4 | B216 | China | *Indica* | Test Set |
+| Honggu | B217 | China | *Indica* | Test Set |
+| Menjiading 2 | B229 | China | *Indica* | Test Set |
+| Sansuijin | B002 | China | Temperate *japonica* | Train Set |
+| Zaoshengbai | B003 | China | Temperate *japonica* | Train Set |
+| Gongchengxiang | B045 | Japan | Temperate *japonica* | Train Set |
+| Laoguangtou 83 | B070 | China | Temperate *japonica* | Train Set |
+| Zimangfeie | B111 | China | Temperate *japonica* | Train Set |
+| Lengshuinuo | B148 | China | Temperate *japonica* | Train Set |
+| Yelicanghua | B161 | China | Temperate *japonica* | Train Set |
+| Baigedao | B162 | China | Temperate *japonica* | Train Set |
+| Zhuyuan | B168 | Japan | Temperate *japonica* | Train Set |
+| Hongmisandan | B199 | China | Temperate *japonica* | Train Set |
+| Longhuamaohu | B204 | China | Temperate *japonica* | Train Set |
+| Cunsanli | B205 | China | Temperate *japonica* | Train Set |
+| Cungunuo | B223 | China | Temperate *japonica* | Train Set |
+| Heimangdao | B226 | China | Temperate *japonica* | Train Set |
+| Haobayong 1 | B228 | China | Temperate *japonica* | Train Set |
+| Wanshi | B005 | Japan | Temperate *japonica* | Test Set |
+| Qiutianxiaoting | B046 | Japan | Temperate *japonica* | Test Set |
+| Yuyannuo | B136 | China | Temperate *japonica* | Test Set |
+| Ailuyu | B169 | Japan | Temperate *japonica* | Test Set |
+| Chimao | B182 | Japan | Temperate *japonica* | Test Set |
+| Heibiao | B001 | China | Temperate *japonica* | Validation Set |
+| Dandongludao | B069 | China | Temperate *japonica* | Validation Set |
+| Muxiqiu | B071 | China | Temperate *japonica* | Validation Set |
+| Laohongdao | B103 | China | Temperate *japonica* | Validation Set |
+| Qingnuo Kyohatamochi | B183 | Japan | Temperate *japonica* | Validation Set |
 
-**Introgression Map Construction and Performance Evaluation**: Predictions are generated on the test set, and the resulting probabilities are visualized along genomic coordinates to construct introgression landscapes. At the same time, indicators such as AUC and ACC are used to quantitatively evaluate the model performance.
+### 2.2 Model architecture
 
-### **3.2 Model Evaluation**
+- Backbone: the pretrained rice OGR model (1.25B parameters, 8 kb context).
+- Fine-tuning: LoRA on attention `q_proj` and `v_proj` (rank = 16, alpha = 32, dropout = 0.1).
+- Pooling: masked mean pooling over token outputs.
+- Projection head: a two-layer MLP from 1024 to 512 to 128.
+- Classification head: output logits, converted to probabilities for [$P_{\textit{japonica}}$, $P_{\textit{indica}}$] via Sigmoid.
+
+### 2.3 Loss
+
+- Joint objective: `L = (1 - lambda) * L_cls + lambda * L_con`
+- `L_cls`: BCEWithLogitsLoss classification loss.
+- `L_con`: supervised contrastive loss for tighter intra-class and wider inter-class separation.
+- `lambda`: 0.1.
+
+### 2.4 Training setup
+
+- Optimizer: AdamW.
+- Learning rate: 1e-5.
+- Weight decay: 0.01.
+- Scheduler: cosine decay with 5% warmup.
+- Batch size: 4; gradient accumulation: 8.
+- Supports DDP/NCCL and FP16 mixed precision.
+
+### 2.5 Evaluation Rules
+
+- Default decision threshold: ε = 0.5.
+- *`japonica`* if $P_{\textit{japonica}}$ >= ε and $P_{\textit{indica}}$ < ε.
+- *`indica`* if $P_{\textit{indica}}$ >= ε and $P_{\textit{japonica}}$ < ε.
+- Otherwise, mark as uncertain.
+- Map window predictions back to genome coordinates for introgression tracks.
+- Evaluation metrics include AUC and ACC.
+
+
+## 3. Results
+
+### 3.1 Model Evaluation
 
 Model performance is evaluated on the test set using the true subpopulation labels of each sample. Classification performance is assessed using AUC (Area Under the Curve) and ACC (Accuracy), which together reflect the model’s overall ability to distinguish subpopulation origins.
 
-|           **Test Set**           |       **Classifier**       | **ACC** | **AUC** |
-| :------------------------------------: | :------------------------------: | :-----------: | :-----------: |
-| 1 Temperate *japonica* + 1 *indica* | Random Forest (n_estimators=100) |     0.804     |     0.794     |
+|           **DataSet**           | **ACC** | **AUC** |
+| :------------------------------------: | :-----------: | :-----------: |
+| Test Set |  0.7895     |     0.8644     |
 
-Based on the subpopulation probabilities ($P_{\textit{indica}}$ and $P_{\textit{japonica}}$), genomic segments are classified as follows:
+### 3.2 Case Study
 
-- If either probability exceeds 0.8, the segment is assigned to the corresponding subpopulation.
-- If neither probabilities exceeds 0.8, or both exceed 0.8, the segment is classified as a low-differentiation region, indicating weak or ambiguous subpopulation signals.
+We applied this framework to analyze *indica* introgression in Yanfeng 47 (YF47), an elite *japonica* cultivar with a history of inter-subspecific hybridization. To minimize prediction ambiguity arising from shared genomic regions, we established a 95th percentile (Q95) confidence threshold based on the ancestral probability distribution of pure *japonica* landraces. Additionally, a regional aggregation strategy—calculating the mean of the top 10 high-scoring 8-kb fragments within a 256-kb sliding window—was employed to quantify local introgression intensity. This approach successfully identified multiple putative *indica* introgression regions across the genome, notably surrounding the *Chalk5* locus.
 
-This strategy enables effective identification of: 1) regions with pure origin; 2) potential introgressed segments; 3) conserved shared regions between *japonica* and *indica*
-
-### **3.3 Case Study**
-
-We tried to apply this framework to investigate *indica* introgression in the *japonica* cultivar Yanfeng 47 (YF47), a representative breeding line derived from historical inter-subspecific breeding behavior. These regions were consistently organized in extended blocks rather than isolated loci, indicating that introgression is captured at the segment level, reflecting the introgression of adjacent genomic fragments during breeding.
+To further resolve the ancestral contribution at *Chalk5*, we conducted a fine-scale perturbation scan at a 100-bp resolution. The results revealed that the enhanced *indica* ancestral signals were primarily concentrated in the promoter region rather than the coding sequence, suggesting that this introgressed haplotype may modulate gene expression via cis-regulatory variation.
 
 ![Case study illustration (e.g. YF47)](images/Elite_Japonica_Cultivar_YF47_Introgression.png)
 
-## **4. Project Structure**
-
-**Directory Tree**
+## 4. Project structure
 
 ```
 1.identification_of_indica-japonica_introgression/
-├── README.md
-├── requirements.txt
+├── configs/
+│   └── config_tuning.yaml      # Default LoRA fine-tuning config
+├── models/
+│   └── model.py                # FullModel and related definitions
+├── rice_datasets/
+│   ├── dataset.py              # RiceDataset implementation
+│   └── arrow_cache.py          # Arrow token cache builder/loader
+├── trainer/
+│   └── trainer.py              # ContrastiveTrainer with joint loss
+├── utils/
+│   ├── trainer_utils.py        # SupConLoss, metrics, checkpoint utilities
+│   └── utils.py
+├── scripts/
+│   ├── run_train.py            # Training entry point
+│   ├── run_inference.py        # Inference entry point
+│   └── run_tokenize.py         # Arrow cache preprocessing
+├── run_train.sh
+├── run_inference.sh
+├── run_tokenize.sh
+├── run_tensorboard.sh
 ├── create_env.sh
-├── cli/
-│   ├── main.py
-│   └── only_test.py
-├── config/
-│   ├── config.yaml
-│   └── only_test.yaml
-├── src/
-│   ├── common/
-│   │   ├── config.py
-│   │   └── schema.py
-│   ├── io/
-│   │   ├── paths.py
-│   │   └── naming.py
-│   ├── datasets/
-│   │   └── prepare.py
-│   ├── features/
-│   │   ├── embedding.py
-│   │   ├── embedding_backend_builtin.py
-│   │   └── sequence_embedding.py
-│   ├── models/
-│   │   └── loader.py
-│   ├── classifiers/
-│   │   └── rf.py
-│   ├── evaluation/
-│   │   ├── metrics.py
-│   │   └── report.py
-│   └── pipelines/
-│       ├── prepare.py
-│       ├── extract.py
-│       ├── train.py
-│       ├── test.py
-│       ├── only_test.py
-│       └── run.py
-├── data/
-├── fasta_data/
-├── model/
-├── embedding_path/
-├── results_path/
-└── images/
+└── requirements.txt
 ```
 
-**Key design points**
+## 5. Environment setup
 
-- Unified pipeline config: `config/config.yaml`
-- External-only evaluation config: `config/only_test.yaml`
-- Entrypoints: `python -m cli.main` and `python -m cli.only_test`
-- Supported stages: `prepare`, `extract`, `train`, `test`, `all`
-- Output layout:
-  - dataset splits: `data/<dataset_tag>/train.jsonl`, `data/<dataset_tag>/test.jsonl`
-  - embeddings: `embedding_path/<model.name>/...` or `embedding_path/<model.name>/runs/<run.name>/...`
-  - results: `results_path/<model.name>/runs/<run.name>/...`
-- Resume-friendly behavior:
-  - `prepare`: skip existing split files
-  - `extract`: extract only missing embedding layers
-  - `train`: skip existing RF model files and reuse existing metrics
-  - `test`: skip existing result TSV files for completed layers
-- Experiment isolation via `run.name` and `run.isolate_embeddings`
+### Quick install
 
-## **5. Quick Start**
+```bash
+bash create_env.sh
+conda activate env_introgression_analysis
+```
 
-### **5.1 Environment Setup**
-
-Run from project root:
+Or manually:
 
 ```bash
 conda create -n env_introgression_analysis python=3.11 -y
@@ -158,113 +172,151 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Or use:
+## 6. Data preparation
 
-```bash
-bash create_env.sh
+### Directory layout
+
+Data directory configured by `data.data_dir` should contain:
+
+```
+{data_dir}/
+├── datasets_info.yaml
+└── {dataset_name}/
+    ├── train.jsonl
+    ├── eval.jsonl
+    └── test.jsonl
 ```
 
-### **5.2 Minimal End-to-End Example**
+### JSONL format
 
-1) Place FASTA files under the path configured by `data_process.fasta_root` in `config/config.yaml`.
-   - Relative paths are resolved from the repository root.
-   - Absolute paths are accepted directly.
+Each line should be a JSON object with a sequence field and a label field configured in `datasets_info.yaml`.
 
-2) Set the experiment name and embedding isolation option in `config/config.yaml`:
+JSONL example per line:
+
+```json
+{"sequence": "ATCGATCG...", "label": [1, 0]}
+```
+
+## 7. Configuration
+
+Config files are YAML and support `${ENV_VAR}` expansion. The default config is `configs/config_tuning.yaml`.
+
+Key config sections:
+
+- `model`: pretrained model path and pooling settings.
+- `lora`: LoRA fine-tuning parameters.
+- `data`: dataset path, dataset name, and split names.
+- `tokenizer`: Arrow cache settings.
+- `train`: learning rate, batch size, scheduler, and contrastive weight.
+- `projection`: projection head dimensions.
+- `task`: task type and label count.
+
+Example config snippet:
 
 ```yaml
-run:
-  name: "exp_001"
-  isolate_embeddings: false
+lora:
+  use_lora: true
+  r: 16
+  alpha: 32
+  dropout: 0.1
+  target_modules: [q_proj, v_proj]
+tokenizer:
+  use_arrow_token_cache: true
+  tokenize_dir: "${MNT_DEFAULT}/Workspace/benchmarks_rice_data/tokenize"
+train:
+  batch_size: 4
+  gradient_accumulation_steps: 8
+  lr: 1e-5
+  weight_decay: 0.01
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.05
+  lambda_contrastive: 0.1
+  fp16: true
+projection:
+  dims: [1024, 512, 128]
 ```
 
-3) Run the full pipeline:
+## 8. Usage
+
+Before running, set required environment variables:
 
 ```bash
-python -m cli.main --config config/config.yaml --stage all --datasets rice_introgression
+export MNT_DEFAULT="/mnt/rice/default"
+export DATASET_NAME="your_dataset_name"
+export RUN_NAME="experiment_name"
 ```
 
-4) Inspect outputs:
+### 8.1 Build Arrow token cache
+
+If `tokenizer.use_arrow_token_cache` is enabled, preprocess with:
 
 ```bash
-ls results_path/rice_1B_stage2_8k_hf/runs/exp_001/
+python scripts/run_tokenize.py \
+  --config configs/config_tuning.yaml \
+  --split-mode train,eval,test
 ```
 
-If `run.name: auto`, a timestamp-based run name will be generated automatically.
-
-## **6. Usage**
-
-### **6.1 Unified Commands**
+Or:
 
 ```bash
-# Full pipeline
-python -m cli.main --config config/config.yaml --stage all
-
-# Stage by stage
-python -m cli.main --config config/config.yaml --stage prepare
-python -m cli.main --config config/config.yaml --stage extract
-python -m cli.main --config config/config.yaml --stage train
-python -m cli.main --config config/config.yaml --stage test
-
-# Run one or more dataset configurations from config
-python -m cli.main --config config/config.yaml --stage all --datasets rice_introgression rice_introgression_1
-
-# External RF x embedding only-test
-python -m cli.only_test --config config/only_test.yaml
+bash run_tokenize.sh
 ```
 
-### **6.2 Resume / Continue After Interruption**
+### 8.2 Training
 
-Re-running the same stage with the same `run.name` will continue safely:
+Single GPU:
 
-- `prepare`: skip existing `train.jsonl` / `test.jsonl`
-- `extract`: extract only missing embedding layers
-- `train`:
-  - skip existing RF model files
-  - reuse existing rows in `training_results.tsv`
-  - train/evaluate only unfinished layers
-- `test`: skip existing result TSV files for completed layers
-
-### **6.3 Run Isolation**
-
-Configure in `config/config.yaml`:
-
-```yaml
-run:
-  name: "exp_001"      # or "auto"
-  isolate_embeddings: false
+```bash
+python scripts/run_train.py --config configs/config_tuning.yaml
 ```
 
-Path behavior:
+Multi-GPU example:
 
-- Results (always isolated):
-  - `results_path/<model.name>/runs/<run.name>/...`
-- Embeddings:
-  - shared cache when `false`: `embedding_path/<model.name>/...`
-  - isolated when `true`: `embedding_path/<model.name>/runs/<run.name>/...`
+```bash
+torchrun --nproc_per_node=8 scripts/run_train.py \
+  --config configs/config_tuning.yaml
+```
 
-### **6.4 only_test (Matrix Evaluation)**
+Or:
 
-`cli.only_test` is an independent evaluation entrypoint for external RF models and embedding files.
+```bash
+bash run_train.sh
+```
 
-- It does not alter the normal `stage=all` workflow.
-- It reads `test.classifier_paths` and `test.embedding_paths` from `config/only_test.yaml`.
-- `pairing: cross` evaluates the Cartesian product of classifiers and embeddings.
-- `pairing: zip` evaluates one-to-one pairs (requires equal list lengths).
-- `thresholds` can contain one or multiple values.
-- Outputs:
-  - one prediction TSV per `(classifier, embedding, threshold)` combination
-  - one `summary.tsv` with aggregated metrics
+### 8.3 Inference
 
-Example config:
+```bash
+python scripts/run_inference.py \
+  --config configs/config_tuning.yaml \
+  --checkpoint /path/to/checkpoints/checkpoint-XXXX
+```
 
-```yaml
-test:
-  classifier_paths:
-    - "results_path/.../a_layer12.rf.pkl"
-  embedding_paths:
-    - "embedding_path/..._layer12_test.pt"
-  output_dir: "results_path/only_test"
-  pairing: "cross"
-  thresholds: [0.5]
+Multi-GPU inference:
+
+```bash
+accelerate launch --num_processes=8 scripts/run_inference.py \
+  --config configs/config_tuning.yaml \
+  --checkpoint /path/to/checkpoints/checkpoint-XXXX
+```
+
+Predictions can be used to generate introgression maps. The threshold is controlled by `train.sigmoid_threshold` (default `0.5`).
+
+### 8.4 TensorBoard
+
+```bash
+tensorboard --logdir /path/to/results --port 6006
+```
+
+## 9. Output layout
+
+Results are saved under `{output_dir}/{model_name}/{dataset_name}/{run_name}/`:
+
+```
+{run_name}/
+├── checkpoints/
+├── logs/
+└── metrics/
+    ├── test_metrics.json
+    ├── inference_results_*.tsv
+    └── ...
 ```
